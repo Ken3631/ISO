@@ -265,24 +265,19 @@
     </div>
 
     <script>
-const passwordHash = "461b2e3622293c303571880413edf2e26b35f5d191b30a32e7eea20da00613d2"; // 密碼: 5881
+        const passwordHash = "461b2e3622293c303571880413edf2e26b35f5d191b30a32e7eea20da00613d2"; 
         
-        // 問答驗證(問題和答案都已加密)
+
         const securityQuestions = [
             {
-                questionHash: "8c8e4c1c8f4e8c5c6e1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3", 
-                questionText: "你最喜歡的數字是什麼?",
-                answerHash: "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9" 
-            },
-            {
-                questionHash: "9c9d4c2c7e3e9c6c5e2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
-                questionText: "ISO27001 是關於什麼標準?",
-                answerHash: "5c6d0e2e1e8e3b5e9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6" 
+                questionHash: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2", 
+                questionText: "你住哪?",
+                answerHash: "429594f515bba19569613a7b4ba4476e44d9852a7c2e5646aa3914cd1f02bcb4" 
             }
         ];
         
-        // 選擇一個隨機問題
-        const selectedQuestion = securityQuestions[Math.floor(Math.random() * securityQuestions.length)];
+        // 選擇問題(現在只有一個問題,不需要隨機)
+        const selectedQuestion = securityQuestions[0];
         
         // ========== 鎖定機制 ==========
         let failedAttempts = 0;
@@ -618,5 +613,6 @@ const passwordHash = "461b2e3622293c303571880413edf2e26b35f5d191b30a32e7eea20da0
     </script>
 </body>
 </html>
+
 
 
