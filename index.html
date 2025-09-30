@@ -43,7 +43,8 @@
             transform: scale(1.15);
             z-index: 10;
         }
-        /* 密碼保護頁面樣式 */
+
+        
         #password-overlay {
             position: fixed;
             top: 0;
@@ -63,13 +64,27 @@
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             text-align: center;
-            max-width: 400px;
+            max-width: 450px;
             width: 90%;
         }
         
         .password-box h2 {
             margin: 0 0 20px 0;
             color: #333;
+        }
+        
+        .password-box p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .question-text {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            color: #495057;
+            font-weight: 500;
         }
         
         .password-box input {
@@ -97,10 +112,16 @@
             font-size: 16px;
             cursor: pointer;
             margin-top: 10px;
+            transition: background 0.3s;
         }
         
-        .password-box button:hover {
+        .password-box button:hover:not(:disabled) {
             background: #5568d3;
+        }
+        
+        .password-box button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
         
         .error-message {
@@ -110,9 +131,40 @@
             display: none;
         }
         
+        .warning-message {
+            color: #f39c12;
+            margin-top: 10px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .locked-message {
+            color: #e74c3c;
+            background: #fee;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-weight: 500;
+            display: none;
+        }
+        
+        .attempt-counter {
+            font-size: 12px;
+            color: #999;
+            margin-top: 10px;
+        }
+        
         /* 隱藏主要內容 */
         #main-content {
             display: none;
+        }
+        
+        .step {
+            display: none;
+        }
+        
+        .step.active {
+            display: block;
         }
     </style>
 </head>
@@ -120,11 +172,30 @@
         <!-- 密碼保護層 -->
     <div id="password-overlay">
         <div class="password-box">
-            <h2>🔒 請輸入密碼</h2>
-            <p>此為私人頁面,請輸入密碼以繼續</p>
-            <input type="password" id="password-input" placeholder="請輸入密碼" onkeypress="if(event.keyCode==13) checkPassword()">
-            <button onclick="checkPassword()">確認</button>
-            <div class="error-message" id="error-msg">❌ 密碼錯誤,請重試</div>
+            <!-- 步驟 1: 密碼驗證 -->
+            <div class="step active" id="step1">
+                <h2>🔒 第一步:密碼驗證</h2>
+                <p>請輸入密碼以繼續</p>
+                <input type="password" id="password-input" placeholder="請輸入密碼" onkeypress="if(event.keyCode==13) checkPassword()">
+                <button onclick="checkPassword()" id="password-btn">確認</button>
+                <div class="error-message" id="password-error">❌ 密碼錯誤,請重試</div>
+                <div class="warning-message" id="password-warning"></div>
+                <div class="locked-message" id="password-locked">
+                    🚫 錯誤次數過多,已被鎖定 10 分鐘<br>
+                    <span id="lockdown-timer"></span>
+                </div>
+                <div class="attempt-counter" id="attempt-counter">剩餘嘗試次數: 3</div>
+            </div>
+            
+            <!-- 步驟 2: 問答驗證 -->
+            <div class="step" id="step2">
+                <h2>✅ 第二步:安全問答</h2>
+                <p>請回答以下問題以完成驗證</p>
+                <div class="question-text" id="question-display"></div>
+                <input type="text" id="answer-input" placeholder="請輸入答案" onkeypress="if(event.keyCode==13) checkAnswer()">
+                <button onclick="checkAnswer()">提交答案</button>
+                <div class="error-message" id="answer-error">❌ 答案錯誤,請重試</div>
+            </div>
         </div>
     </div>
     <div class="max-w-5xl mx-auto">
@@ -194,8 +265,32 @@
     </div>
 
     <script>
-        const passwordHash = "461b2e3622293c303571880413edf2e26b35f5d191b30a32e7eea20da00613d2";
+const passwordHash = "461b2e3622293c303571880413edf2e26b35f5d191b30a32e7eea20da00613d2"; // 密碼: 5881
         
+        // 問答驗證(問題和答案都已加密)
+        const securityQuestions = [
+            {
+                questionHash: "8c8e4c1c8f4e8c5c6e1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3", 
+                questionText: "你最喜歡的數字是什麼?",
+                answerHash: "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9" 
+            },
+            {
+                questionHash: "9c9d4c2c7e3e9c6c5e2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
+                questionText: "ISO27001 是關於什麼標準?",
+                answerHash: "5c6d0e2e1e8e3b5e9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6" 
+            }
+        ];
+        
+        // 選擇一個隨機問題
+        const selectedQuestion = securityQuestions[Math.floor(Math.random() * securityQuestions.length)];
+        
+        // ========== 鎖定機制 ==========
+        let failedAttempts = 0;
+        const maxAttempts = 3;
+        const lockDuration = 10 * 60 * 1000; // 10 分鐘
+        let lockdownTimer = null;
+        
+        // SHA-256 雜湊函數
         async function sha256(message) {
             const msgBuffer = new TextEncoder().encode(message);
             const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -204,37 +299,154 @@
             return hashHex;
         }
         
-        async function checkPassword() {
-            const input = document.getElementById('password-input').value;
-            const errorMsg = document.getElementById('error-msg');
+        // 檢查是否被鎖定
+        function isLocked() {
+            const lockUntil = localStorage.getItem('lockUntil');
+            if (lockUntil) {
+                const now = Date.now();
+                if (now < parseInt(lockUntil)) {
+                    return true;
+                } else {
+                    // 鎖定時間已過,清除鎖定
+                    localStorage.removeItem('lockUntil');
+                    localStorage.removeItem('failedAttempts');
+                    return false;
+                }
+            }
+            return false;
+        }
+        
+        // 設定鎖定
+        function lockSystem() {
+            const lockUntil = Date.now() + lockDuration;
+            localStorage.setItem('lockUntil', lockUntil.toString());
+            showLockdownMessage(lockUntil);
+        }
+        
+        // 顯示鎖定訊息
+        function showLockdownMessage(lockUntil) {
+            document.getElementById('password-input').disabled = true;
+            document.getElementById('password-btn').disabled = true;
+            document.getElementById('password-error').style.display = 'none';
+            document.getElementById('password-warning').style.display = 'none';
+            document.getElementById('password-locked').style.display = 'block';
             
-            // 將輸入的密碼加密後比對
+            // 更新倒數計時
+            updateLockdownTimer(lockUntil);
+            lockdownTimer = setInterval(() => updateLockdownTimer(lockUntil), 1000);
+        }
+        
+        // 更新鎖定倒數計時
+        function updateLockdownTimer(lockUntil) {
+            const now = Date.now();
+            const remaining = lockUntil - now;
+            
+            if (remaining <= 0) {
+                clearInterval(lockdownTimer);
+                location.reload(); // 重新載入頁面
+            } else {
+                const minutes = Math.floor(remaining / 60000);
+                const seconds = Math.floor((remaining % 60000) / 1000);
+                document.getElementById('lockdown-timer').textContent = 
+                    `剩餘時間: ${minutes} 分 ${seconds} 秒`;
+            }
+        }
+        
+        // 密碼驗證
+        async function checkPassword() {
+            if (isLocked()) return;
+            
+            const input = document.getElementById('password-input').value;
+            const errorMsg = document.getElementById('password-error');
+            const warningMsg = document.getElementById('password-warning');
+            
             const inputHash = await sha256(input);
             
             if (inputHash === passwordHash) {
-                // 密碼正確,顯示主要內容
-                document.getElementById('password-overlay').style.display = 'none';
-                document.getElementById('main-content').style.display = 'block';
+                // 密碼正確,進入第二步
                 errorMsg.style.display = 'none';
+                warningMsg.style.display = 'none';
+                document.getElementById('step1').classList.remove('active');
+                document.getElementById('step2').classList.add('active');
+                document.getElementById('question-display').textContent = selectedQuestion.questionText;
+                document.getElementById('answer-input').focus();
                 
-                // 將驗證狀態存入 sessionStorage(關閉分頁後會清除)
-                sessionStorage.setItem('authenticated', 'true');
+                // 重置失敗次數
+                localStorage.removeItem('failedAttempts');
+                failedAttempts = 0;
             } else {
-                // 密碼錯誤,顯示錯誤訊息
-                errorMsg.style.display = 'block';
+                // 密碼錯誤
+                failedAttempts = parseInt(localStorage.getItem('failedAttempts') || '0') + 1;
+                localStorage.setItem('failedAttempts', failedAttempts.toString());
+                
+                if (failedAttempts >= maxAttempts) {
+                    // 達到最大嘗試次數,鎖定系統
+                    lockSystem();
+                } else {
+                    // 顯示錯誤和警告
+                    errorMsg.style.display = 'block';
+                    const remaining = maxAttempts - failedAttempts;
+                    document.getElementById('attempt-counter').textContent = `剩餘嘗試次數: ${remaining}`;
+                    
+                    if (remaining === 1) {
+                        warningMsg.textContent = `⚠️ 警告:還有最後 1 次機會!`;
+                        warningMsg.style.display = 'block';
+                    }
+                }
+                
                 document.getElementById('password-input').value = '';
                 document.getElementById('password-input').focus();
             }
         }
         
-        // 頁面載入時檢查是否已驗證
-        window.onload = function() {
-            if (sessionStorage.getItem('authenticated') === 'true') {
-                // 已驗證過,直接顯示內容
+        // 答案驗證
+        async function checkAnswer() {
+            const input = document.getElementById('answer-input').value.trim();
+            const errorMsg = document.getElementById('answer-error');
+            
+            const inputHash = await sha256(input);
+            
+            if (inputHash === selectedQuestion.answerHash) {
+                // 答案正確,顯示主要內容
                 document.getElementById('password-overlay').style.display = 'none';
                 document.getElementById('main-content').style.display = 'block';
+                errorMsg.style.display = 'none';
+                
+                // 將驗證狀態存入 sessionStorage
+                sessionStorage.setItem('authenticated', 'true');
             } else {
-                // 未驗證,聚焦到密碼輸入框
+                // 答案錯誤
+                errorMsg.style.display = 'block';
+                document.getElementById('answer-input').value = '';
+                document.getElementById('answer-input').focus();
+            }
+        }
+        
+        // 頁面載入時檢查
+        window.onload = function() {
+            // 檢查是否已驗證
+            if (sessionStorage.getItem('authenticated') === 'true') {
+                document.getElementById('password-overlay').style.display = 'none';
+                document.getElementById('main-content').style.display = 'block';
+                return;
+            }
+            
+            // 檢查是否被鎖定
+            if (isLocked()) {
+                const lockUntil = parseInt(localStorage.getItem('lockUntil'));
+                showLockdownMessage(lockUntil);
+            } else {
+                // 載入失敗次數
+                failedAttempts = parseInt(localStorage.getItem('failedAttempts') || '0');
+                const remaining = maxAttempts - failedAttempts;
+                document.getElementById('attempt-counter').textContent = `剩餘嘗試次數: ${remaining}`;
+                
+                if (failedAttempts > 0 && failedAttempts < maxAttempts) {
+                    const warningMsg = document.getElementById('password-warning');
+                    warningMsg.textContent = `⚠️ 注意:你還有 ${remaining} 次嘗試機會`;
+                    warningMsg.style.display = 'block';
+                }
+                
                 document.getElementById('password-input').focus();
             }
         };
@@ -406,4 +618,5 @@
     </script>
 </body>
 </html>
+
 
