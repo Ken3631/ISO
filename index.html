@@ -194,10 +194,8 @@
     </div>
 
     <script>
-                // 密碼的 SHA-256 雜湊值(已加密,不會直接顯示密碼)
         const passwordHash = "461b2e3622293c303571880413edf2e26b35f5d191b30a32e7eea20da00613d2";
         
-        // SHA-256 雜湊函數
         async function sha256(message) {
             const msgBuffer = new TextEncoder().encode(message);
             const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -408,3 +406,4 @@
     </script>
 </body>
 </html>
+
